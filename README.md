@@ -1,6 +1,7 @@
 # NetEaseService
 网易云信服务端含登录、注册、数据库、websocke连接
 # 启动登录注册服务
+可用于用户注册登录，数据保存至数据库、数据库已配置
 ```
 python3 service.py
 ```
@@ -17,6 +18,7 @@ http://localhost:5001/login
 http://localhost:5001/users
 ```
 # 启动Websocke服务
+websocke服务用于查询用户连接服务器数据，并且能够实现获取当前用户操作
 ```
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
