@@ -12,6 +12,10 @@ http://localhost:5001/create_account
 ```
 http://localhost:5001/login
 ```
+查询所有用户数据
+```
+http://localhost:5001/users
+```
 # 启动Websocke服务
 ```
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
