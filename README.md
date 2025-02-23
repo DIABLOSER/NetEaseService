@@ -3,7 +3,7 @@
 
 网易云信服务端含登录、注册、数据库、websocke连接
 
-参考[网易云信服务端API]([URL](https://doc.yunxin.163.com/messaging2/server-apis/jA1MTQ4MDU?platform=server))
+参考([网易云信服务端API](https://doc.yunxin.163.com/messaging2/server-apis/jA1MTQ4MDU?platform=server))
 
 # 启动登录注册服务
 可用于用户注册登录，数据保存至数据库、数据库已配置
