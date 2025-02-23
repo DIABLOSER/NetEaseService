@@ -1,5 +1,5 @@
 # NetEaseService
-网易云服务端
+网易云信服务端含登录、注册、数据库、websocke连接
 # 启动登录注册服务
 ```
 python3 service.py
