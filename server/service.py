@@ -173,7 +173,8 @@ def handle_login():
 
     # 查询数据库（支持account_id或account登录）
     user = User.query.filter(
-        (User.account == username) & (User.token == input_token)
+        # 使用账号Id+token登录
+        (User.account_id == username) & (User.token == input_token)
     ).first()
 
     if not user:
