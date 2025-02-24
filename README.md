@@ -55,3 +55,32 @@ curl http://localhost:8000/get_input/android123
   "input_content": "Hello World!"
 }
 ```
+# 启动短信服务端
+```
+python3 sms_server.py
+```
+发送短信验证码
+
+请求地址
+```
+http://localhost:5002/send_sms_code
+```
+请求参数
+```
+{
+  "phone_number": "13900000000"
+}
+```
+验证短信验证码
+
+请求地址
+```
+http://localhost:5002/verify_sms_code
+```
+请求参数
+```
+{
+  "phone_number": "13900000000",
+  "code": "123456"
+}
+```
