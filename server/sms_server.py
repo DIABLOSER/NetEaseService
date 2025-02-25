@@ -11,10 +11,10 @@ app = Flask(__name__)
 redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
 
 # 阿里云配置
-ACCESS_KEY_ID = 'your-access-key-id'
-ACCESS_KEY_SECRET = 'your-access-key-secret'
-SIGN_NAME = 'YourSignName'
-TEMPLATE_CODE = 'YourTemplateCode'
+ACCESS_KEY_ID = 'LTAI5tRjty3uvxKAP9HRFapu'
+ACCESS_KEY_SECRET = '3jSzla6GmUxnD2QfcC3R8NF2UlodOt'
+SIGN_NAME = '谈信'
+TEMPLATE_CODE = 'SMS_479055455'
 
 # 生成验证码
 def generate_verification_code():
