@@ -84,3 +84,37 @@ http://localhost:5002/verify_sms_code
   "code": "123456"
 }
 ```
+# 增加表情管理服务
+添加表情
+
+请求地址
+```
+http://locahost:5002/upload
+```
+请求参数
+```
+{
+  image_path:"文件路径"
+  token:"userId"
+}
+```
+查询表情
+```
+http://locahost:5002/query
+```
+请求参数
+```
+{
+  token:"userId"
+}
+```
+删除表情
+```
+http://localhost:5002/delete
+```
+请求参数
+```
+{
+  objectid:"objectid"
+}
+```
