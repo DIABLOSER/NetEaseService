@@ -89,7 +89,7 @@ http://localhost:5002/verify_sms_code
 
 请求地址
 ```
-http://locahost:5002/upload
+http://locahost:5000/upload
 ```
 请求参数
 ```
@@ -100,7 +100,7 @@ http://locahost:5002/upload
 ```
 查询表情
 ```
-http://locahost:5002/query
+http://locahost:5000/query
 ```
 请求参数
 ```
@@ -110,7 +110,7 @@ http://locahost:5002/query
 ```
 删除表情
 ```
-http://localhost:5002/delete
+http://localhost:5000/delete
 ```
 请求参数
 ```
