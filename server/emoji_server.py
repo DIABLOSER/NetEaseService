@@ -42,28 +42,24 @@ def allowed_file(filename):
 @app.route('/upload', methods=['POST'])
 def upload_image():
     token = request.form.get('token')
-    image_path = request.form.get('image_path')
+    file = request.files.get('file')  # 获取上传的文件
 
-    if not token or not image_path:
-        return jsonify({'error': 'Missing token or image path'}), 400
+    if not token or not file:
+        return jsonify({'error': 'Missing token or file'}), 400
 
     try:
-        # 获取图片文件名
-        filename = os.path.basename(image_path)
-        
+        filename = secure_filename(file.filename)
+
         # 检查文件格式
         if not allowed_file(filename):
             return jsonify({'error': 'File type not allowed'}), 400
-        
-        # 生成安全的文件名
-        safe_filename = secure_filename(filename)
-        
-        # 将图片复制到上传文件夹
-        destination_path = os.path.join(UPLOAD_FOLDER, safe_filename)
-        shutil.copy(image_path, destination_path)
+
+        # 保存文件到上传文件夹
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(file_path)
 
         # 创建新的Image对象
-        image_record = Image(url=destination_path, token=token)
+        image_record = Image(url=file_path, token=token)
 
         # 保存记录到数据库
         db.session.add(image_record)
@@ -71,7 +67,7 @@ def upload_image():
 
         return jsonify({
             'message': 'Image uploaded successfully', 
-            'file_path': destination_path,
+            'file_path': file_path,
             'objectId': image_record.id
         }), 200
 
@@ -126,5 +122,6 @@ def get_images_by_token():
 
 if __name__ == '__main__':
      app.run(debug=True, host='0.0.0.0', port=5003)
+
 
 
