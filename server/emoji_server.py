@@ -37,46 +37,7 @@ def generate_token():
 
 # 移除 generate_token 函数
 
-@app.route('/api/upload', methods=['POST'])
-def upload_image():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-
-    # 从请求中获取 token
-    token = request.form.get('token')
-    if not token:
-        return jsonify({'error': 'Missing token'}), 400
-
-    if file:
-        # 生成唯一信息
-        object_id = generate_object_id()
-        filename = secure_filename(file.filename)
-        ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
-        unique_filename = f"{object_id}.{ext}" if ext else object_id
-        
-        # 保存文件
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-        file.save(file_path)
-        
-        # 创建数据库记录
-        image = Image(
-            object_id=object_id,
-            token=token,
-            filename=unique_filename,
-            url=f"{request.host_url}uploads/{unique_filename}"  # 拼接服务器地址
-        )
-        db.session.add(image)
-        db.session.commit()
-
-        return jsonify({
-            'object_id': object_id,
-            'token': token,
-            'url': image.url
-        }), 201
+https://github.com/DIABLOSER/NetEaseService.git
         
 @app.route('/api/image', methods=['GET'])
 def get_image():
