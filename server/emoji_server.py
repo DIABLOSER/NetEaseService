@@ -68,7 +68,7 @@ def upload_image():
             object_id=object_id,
             token=token,
             filename=unique_filename,
-            url=f"/uploads/{unique_filename}"
+            url=f"{request.host_url}uploads/{unique_filename}"  # 拼接服务器地址
         )
         db.session.add(image)
         db.session.commit()
@@ -78,6 +78,7 @@ def upload_image():
             'token': token,
             'url': image.url
         }), 201
+        
 @app.route('/api/image', methods=['GET'])
 def get_image():
     token = request.args.get('token')
