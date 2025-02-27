@@ -35,6 +35,8 @@ def generate_object_id():
 def generate_token():
     return secrets.token_hex(16)
 
+# 移除 generate_token 函数
+
 @app.route('/api/upload', methods=['POST'])
 def upload_image():
     if 'file' not in request.files:
@@ -49,17 +51,10 @@ def upload_image():
     if not token:
         return jsonify({'error': 'Missing token'}), 400
 
-    # 检查文件类型
-    # allowed_extensions = {'png', 'jpg', 'jpeg'}
-    ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-    # if ext not in allowed_extensions:
-    #     return jsonify({'error': 'Invalid file type. Only .png, .jpg, and .jpeg are allowed.'}), 400
-
     if file:
         # 生成唯一信息
         object_id = generate_object_id()
-        filename = secure_filename(file.filename)
-        unique_filename = f"{object_id}.{ext}"  # 保留原始文件后缀
+        unique_filename = f"{object_id}.png"  # 强制保存为 .png 格式
         
         # 保存文件
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
