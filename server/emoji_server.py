@@ -1,6 +1,7 @@
 import os
 import uuid
 import secrets
+import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
@@ -13,6 +14,7 @@ db = SQLAlchemy(app)
 
 # 创建上传目录
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
 class Image(db.Model):
     id = db.Column(db.String(36), primary_key=True)
     token = db.Column(db.String(32), nullable=False)  # 移除 unique=True
@@ -91,6 +93,7 @@ def get_image():
         'url': image.url,
         'token': image.token
     } for image in images])
+
 @app.route('/api/image/<object_id>', methods=['DELETE'])
 def delete_image(object_id):
     # 查询图片记录
@@ -109,9 +112,54 @@ def delete_image(object_id):
     db.session.commit()
 
     return jsonify({'message': 'Image deleted successfully'})
+
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/api/upload_from_url', methods=['POST'])
+def upload_image_from_url():
+    # 从请求中获取 url 和 token
+    url = request.form.get('url')
+    token = request.form.get('token')
+    
+    if not url:
+        return jsonify({'error': 'Missing URL'}), 400
+    if not token:
+        return jsonify({'error': 'Missing token'}), 400
+
+    try:
+        # 下载图片
+        response = requests.get(url, stream=True)
+        response.raise_for_status()  # 检查请求是否成功
+    except requests.RequestException as e:
+        return jsonify({'error': f'Failed to download image: {str(e)}'}), 400
+
+    # 生成唯一信息
+    object_id = generate_object_id()
+    unique_filename = f"{object_id}.png"  # 强制保存为 .png 格式
+    
+    # 保存文件
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+    with open(file_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+    
+    # 创建数据库记录
+    image = Image(
+        object_id=object_id,
+        token=token,
+        filename=unique_filename,
+        url=f"{request.host_url}uploads/{unique_filename}"  # 拼接服务器地址
+    )
+    db.session.add(image)
+    db.session.commit()
+
+    return jsonify({
+        'object_id': object_id,
+        'token': token,
+        'url': image.url
+    }), 201
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5003, debug=True)
