@@ -1,7 +1,6 @@
 import os
 import uuid
 import secrets
-import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
@@ -117,8 +116,8 @@ def delete_image(object_id):
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/api/upload_from_url', methods=['POST'])
-def upload_image_from_url():
+@app.route('/api/add_image_url', methods=['POST'])
+def add_image_url():
     # 从请求中获取 url 和 token
     url = request.form.get('url')
     token = request.form.get('token')
@@ -128,29 +127,16 @@ def upload_image_from_url():
     if not token:
         return jsonify({'error': 'Missing token'}), 400
 
-    try:
-        # 下载图片
-        response = requests.get(url, stream=True)
-        response.raise_for_status()  # 检查请求是否成功
-    except requests.RequestException as e:
-        return jsonify({'error': f'Failed to download image: {str(e)}'}), 400
-
     # 生成唯一信息
     object_id = generate_object_id()
-    unique_filename = f"{object_id}.png"  # 强制保存为 .png 格式
-    
-    # 保存文件
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-    with open(file_path, 'wb') as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
-    
+    filename = url.split('/')[-1]  # 使用 URL 的最后一个部分作为文件名
+
     # 创建数据库记录
     image = Image(
         object_id=object_id,
         token=token,
-        filename=unique_filename,
-        url=f"{request.host_url}uploads/{unique_filename}"  # 拼接服务器地址
+        filename=filename,
+        url=url  # 直接使用传入的 URL
     )
     db.session.add(image)
     db.session.commit()
