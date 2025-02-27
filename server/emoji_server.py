@@ -1,127 +1,130 @@
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
 import os
-import shutil
-from werkzeug.utils import secure_filename
 import uuid
+import secrets
+from flask import Flask, request, jsonify, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-
-# 配置数据库，SQLite存储
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///images.db'  # 使用SQLite数据库
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 禁用对象修改追踪
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///images.db'
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 db = SQLAlchemy(app)
 
-# 配置上传文件夹和支持的文件类型
-UPLOAD_FOLDER = './emoji_images'  # 存储上传图片的文件夹
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}  # 支持的图片格式
+# 创建上传目录
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# 确保上传文件夹存在
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-# 创建图片信息表
 class Image(db.Model):
-    __tablename__ = 'images'
-    id = db.Column(db.String(36), primary_key=True, default=str(uuid.uuid4()))  # objectId
-    url = db.Column(db.String(200), nullable=False)
-    token = db.Column(db.String(50), nullable=False)
+    id = db.Column(db.String(36), primary_key=True)
+    token = db.Column(db.String(32), unique=True, nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    url = db.Column(db.String(255), nullable=False)
 
-    def __repr__(self):
-        return f"<Image {self.id}>"
+    def __init__(self, object_id, token, filename, url):
+        self.id = object_id
+        self.token = token
+        self.filename = filename
+        self.url = url
 
-# 使用 app_context 来初始化数据库表
+# 创建数据库表
 with app.app_context():
-    db.create_all()  # 创建数据库表
+    db.create_all()
 
-# 检查文件格式是否允许
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+def generate_object_id():
+    return str(uuid.uuid4())
 
-# 上传图片并保存数据库记录
-@app.route('/upload', methods=['POST'])
+def generate_token():
+    return secrets.token_hex(16)
+
+# 移除 generate_token 函数
+
+@app.route('/api/upload', methods=['POST'])
 def upload_image():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    # 从请求中获取 token
     token = request.form.get('token')
-    file = request.files.get('file')  # 获取上传的文件
-
-    if not token or not file:
-        return jsonify({'error': 'Missing token or file'}), 400
-
-    try:
-        filename = secure_filename(file.filename)
-
-        # 检查文件格式
-        if not allowed_file(filename):
-            return jsonify({'error': 'File type not allowed'}), 400
-
-        # 保存文件到上传文件夹
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(file_path)
-
-        # 创建新的Image对象
-        image_record = Image(url=file_path, token=token)
-
-        # 保存记录到数据库
-        db.session.add(image_record)
-        db.session.commit()
-
-        return jsonify({
-            'message': 'Image uploaded successfully', 
-            'file_path': file_path,
-            'objectId': image_record.id
-        }), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# 根据 objectId 删除记录
-@app.route('/delete', methods=['DELETE'])
-def delete_image():
-    object_id = request.args.get('objectId')
-
-    if not object_id:
-        return jsonify({'error': 'Missing objectId'}), 400
-
-    # 查询数据库，删除指定 objectId 的记录
-    image_record = Image.query.filter_by(id=object_id).first()
-
-    if not image_record:
-        return jsonify({'error': 'Image record not found'}), 404
-
-    try:
-        # 删除文件
-        if os.path.exists(image_record.url):
-            os.remove(image_record.url)
-
-        # 删除数据库中的记录
-        db.session.delete(image_record)
-        db.session.commit()
-
-        return jsonify({'message': 'Image deleted successfully'}), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# 根据token查询图片
-@app.route('/query', methods=['GET'])
-def get_images_by_token():
-    token = request.args.get('token')
-
     if not token:
         return jsonify({'error': 'Missing token'}), 400
 
-    # 查询该token对应的所有图片记录
-    images = Image.query.filter_by(token=token).all()
-    
-    if not images:
-        return jsonify({'error': 'No images found for this token'}), 404
+    if file:
+        # 生成唯一信息
+        object_id = generate_object_id()
+        filename = secure_filename(file.filename)
+        ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+        unique_filename = f"{object_id}.{ext}" if ext else object_id
+        
+        # 保存文件
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        file.save(file_path)
+        
+        # 创建数据库记录
+        image = Image(
+            object_id=object_id,
+            token=token,
+            filename=unique_filename,
+            url=f"/uploads/{unique_filename}"
+        )
+        db.session.add(image)
+        db.session.commit()
 
-    image_urls = [image.url for image in images]
+        return jsonify({
+            'object_id': object_id,
+            'token': token,
+            'url': image.url
+        }), 201
+@app.route('/api/image', methods=['GET'])
+def get_image():
+    token = request.args.get('token')
+    if not token:
+        return jsonify({'error': 'Missing token'}), 400
 
-    return jsonify({'token': token, 'images': image_urls}), 200
+    image = Image.query.filter_by(token=token).first()
+    if not image:
+        return jsonify({'error': 'Image not found'}), 404
+
+    return jsonify({
+        'object_id': image.id,
+        'url': image.url,
+        'token': image.token
+    })
+
+@app.route('/api/image/<object_id>', methods=['DELETE'])
+def delete_image(object_id):
+    token = request.args.get('token')
+    if not token:
+        return jsonify({'error': 'Missing token'}), 400
+
+    image = Image.query.get(object_id)
+    if not image:
+        return jsonify({'error': 'Image not found'}), 404
+
+    if image.token != token:
+        return jsonify({'error': 'Invalid token'}), 403
+
+    # 删除文件
+    try:
+        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], image.filename))
+    except FileNotFoundError:
+        pass
+
+    # 删除记录
+    db.session.delete(image)
+    db.session.commit()
+
+    return jsonify({'message': 'Image deleted successfully'})
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
-     app.run(debug=True, host='0.0.0.0', port=5003)
+    app.run(host='0.0.0.0', port=5003, debug=True)
 
 
 
