@@ -13,10 +13,9 @@ db = SQLAlchemy(app)
 
 # 创建上传目录
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
 class Image(db.Model):
     id = db.Column(db.String(36), primary_key=True)
-    token = db.Column(db.String(32), unique=True, nullable=False)
+    token = db.Column(db.String(32), nullable=False)  # 移除 unique=True
     filename = db.Column(db.String(255), nullable=False)
     url = db.Column(db.String(255), nullable=False)
 
@@ -85,28 +84,21 @@ def get_image():
     if not token:
         return jsonify({'error': 'Missing token'}), 400
 
-    image = Image.query.filter_by(token=token).first()
-    if not image:
-        return jsonify({'error': 'Image not found'}), 404
+    images = Image.query.filter_by(token=token).all()
+    if not images:
+        return jsonify({'error': 'No images found for this token'}), 404
 
-    return jsonify({
+    return jsonify([{
         'object_id': image.id,
         'url': image.url,
         'token': image.token
-    })
-
+    } for image in images])
 @app.route('/api/image/<object_id>', methods=['DELETE'])
 def delete_image(object_id):
-    token = request.args.get('token')
-    if not token:
-        return jsonify({'error': 'Missing token'}), 400
-
+    # 查询图片记录
     image = Image.query.get(object_id)
     if not image:
         return jsonify({'error': 'Image not found'}), 404
-
-    if image.token != token:
-        return jsonify({'error': 'Invalid token'}), 403
 
     # 删除文件
     try:
@@ -119,7 +111,6 @@ def delete_image(object_id):
     db.session.commit()
 
     return jsonify({'message': 'Image deleted successfully'})
-
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
