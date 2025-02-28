@@ -45,8 +45,8 @@ class User(db.Model):
 
 # 网易云信API配置
 BASE_URL = "https://api.netease.im/nimserver/user/create.action"
-APP_KEY = '9f9f680a14b27ed0b420eb79940ca0b4'
-APP_SECRET = 'eb345d027e0b'
+APP_KEY = '94e2d4e8e64665e47d04e4f4e6d1840a'
+APP_SECRET = '47d1496b029a'
 
 # 先定义会被路由调用的函数
 def generate_checksum(secret, nonce, cur_time):
