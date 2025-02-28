@@ -116,7 +116,7 @@ def delete_image(object_id):
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/api/add_image_url', methods=['POST'])
+@app.route('/api/upload_from_url', methods=['POST'])
 def add_image_url():
     # 从请求中获取 url 和 token
     url = request.form.get('url')
