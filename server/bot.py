@@ -61,7 +61,7 @@ app = Flask(__name__)
 @app.route('/callback', methods=['POST'])
 def message_callback():
     """
-    处理消息回调
+    处理消息回调（支持个人消息和群聊消息）
     """
     try:
         data = request.json
@@ -69,29 +69,36 @@ def message_callback():
 
         event_type = data.get("eventType")
         msg_from = data.get("fromAccount")
+        msg_body = data.get("body", "")
 
-        # 处理新消息回调
-        if event_type == 1:  
-            body_raw = data.get("body", "{}")
-            try:
-                msg_body = json.loads(body_raw)
-            except json.JSONDecodeError:
-                msg_body = {"msg": body_raw}  # 直接作为字符串处理
+        if event_type == 1:  # 私聊消息
+            print(f"收到来自 {msg_from} 的私聊消息: {msg_body}")
 
-            print(f"收到来自 {msg_from} 的消息: {msg_body.get('msg')}")
-
-            # 自动回复逻辑
+            # 自动回复
             send_text_message(
-                from_accid=BOT_ACCOUNT,  
+                from_accid=BOT_ACCOUNT,
                 to_accid=msg_from,
-                text="[自动回复] 已收到您的消息"
+                text=f"[自动回复] 你说的是: {msg_body}"
             )
+
+        elif event_type == 2:  # 群聊消息
+            group_id = data.get("to")  # 群聊ID
+            print(f"收到来自 {msg_from} 在群 {group_id} 的消息: {msg_body}")
+
+            # 避免机器人自己回复自己
+            if msg_from != BOT_ACCOUNT:
+                send_text_message(
+                    from_accid=BOT_ACCOUNT,
+                    to_accid=group_id,  # 群聊消息，发送到群ID
+                    text=f"[自动回复] {msg_from} 说: {msg_body}"
+                )
 
         return jsonify({"code": 200})
 
     except Exception as e:
         print(f"回调处理异常: {str(e)}")
         return jsonify({"code": 500, "error": str(e)})
+
 
 if __name__ == "__main__":
     # 测试发送消息
