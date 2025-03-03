@@ -73,7 +73,7 @@ def message_callback():
         event_type = data.get("eventType")
         
         # 处理新消息回调
-        if event_type == "1":  
+        if event_type == 1:  
             msg_from = data.get("fromAccount")
             msg_body = json.loads(data.get("body", "{}"))
             
