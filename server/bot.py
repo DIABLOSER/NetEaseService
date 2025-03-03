@@ -66,7 +66,7 @@ def message_callback():
     """
     try:
         data = request.json
-        
+        print("[DEBUG] 原始回调数据:", data)  # 添加调试日志
         # 验证回调合法性（可选）
         # 实际生产环境需校验checksum和IP白名单
         
