@@ -101,4 +101,4 @@ if __name__ == "__main__":
     )
     
     # 启动回调服务器（默认端口5000）
-    app.run(host='0.0.0.0', port=5004, debug=False)
+    app.run(host='0.0.0.0', port=5004, debug=True)
