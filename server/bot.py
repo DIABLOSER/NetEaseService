@@ -62,32 +62,33 @@ app = Flask(__name__)
 def message_callback():
     """
     处理消息回调
-    官方文档：https://dev.yunxin.163.com/docs/接口文档/服务端回调事件
     """
     try:
         data = request.json
-        print("[DEBUG] 原始回调数据:", data)  # 添加调试日志
-        # 验证回调合法性（可选）
-        # 实际生产环境需校验checksum和IP白名单
-        
+        print("[DEBUG] 原始回调数据:", data)
+
         event_type = data.get("eventType")
-        
+        msg_from = data.get("fromAccount")
+
         # 处理新消息回调
         if event_type == 1:  
-            msg_from = data.get("fromAccount")
-            msg_body = json.loads(data.get("body", "{}"))
-            
+            body_raw = data.get("body", "{}")
+            try:
+                msg_body = json.loads(body_raw)
+            except json.JSONDecodeError:
+                msg_body = {"msg": body_raw}  # 直接作为字符串处理
+
             print(f"收到来自 {msg_from} 的消息: {msg_body.get('msg')}")
-            
+
             # 自动回复逻辑
             send_text_message(
-                from_accid=BOT_ACCOUNT,  # 机器人账号
+                from_accid=BOT_ACCOUNT,  
                 to_accid=msg_from,
                 text="[自动回复] 已收到您的消息"
             )
-            
+
         return jsonify({"code": 200})
-    
+
     except Exception as e:
         print(f"回调处理异常: {str(e)}")
         return jsonify({"code": 500, "error": str(e)})
