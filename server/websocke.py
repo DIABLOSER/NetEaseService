@@ -73,7 +73,14 @@ async def get_input(android_id: str):
     # 获取结果并清理pending_requests
     _, result = pending_requests.pop(request_id)
     return {"android_id": android_id, "input_content": result}
-
+# 新增的查询接口
+@app.get("/connected_clients")
+async def get_connected_clients():
+    """获取所有已连接的安卓端ID列表"""
+    return {
+        "connected_clients": list(connected_clients.keys())
+    }
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
