@@ -456,8 +456,8 @@ def get_group_info():
     
     if not tid:
         return jsonify({'error': '缺少群组ID'}), 400
-    
-    payload = {'tids': tid, 'ope': '1'}
+    #payload = {'tid': tid, 'ope': '1'}
+    payload = {'tid': tid}
     headers = generate_headers()
     response = requests.post(GROPUP_URL, headers=headers, data=payload)
     
