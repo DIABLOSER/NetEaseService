@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify,send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 import requests
 import hashlib
@@ -12,15 +12,15 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 
-# 配置SQLite账号数据库
+# 配置多个数据库连接
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///accounts.db'
+app.config['SQLALCHEMY_BINDS'] = {
+    'images': 'sqlite:///images.db'  # 绑定 images 数据库
+}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///images.db'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
-db2 = SQLAlchemy(app)
 
 # 创建上传目录
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -29,16 +29,17 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 APP_KEY = '94e2d4e8e64665e47d04e4f4e6d1840a'
 APP_SECRET = '47d1496b029a'
 SMS_TEMPLATE_ID = "YOUR_TEMPLATE_ID"  # 短信模板ID（需通过审核）
-# 网易云信API基础地址
-#创建账号的URL
 BASE_URL = "https://api.netease.im/nimserver/user/create.action"
-#发送短信的URL
 SEND_SMS_URL = "https://api.netease.im/sms/sendcode.action"
-#获取群聊信息的URL
 GROPUP_URL = 'https://api.netease.im/nimserver/team/queryDetail.action'
+
+# 初始化单个 SQLAlchemy 实例
+db = SQLAlchemy(app)
+
 # 更新后的用户模型
 class User(db.Model):
     __tablename__ = 'users'
+    __bind_key__ = None  # 默认数据库连接
     id = db.Column(db.Integer, primary_key=True)
     account_id = db.Column(db.String(80), unique=True, nullable=False)
     account = db.Column(db.String(80), unique=True, nullable=False)
@@ -62,8 +63,11 @@ class User(db.Model):
         "extension": "",
         "antispam_business_id": ""
     }))
+
 # 表情模型
 class Image(db.Model):
+    __tablename__ = 'images'
+    __bind_key__ = 'images'  # 指定使用 images 数据库连接
     id = db.Column(db.String(36), primary_key=True)
     token = db.Column(db.String(32), nullable=False)  # 移除 unique=True
     filename = db.Column(db.String(255), nullable=False)
@@ -78,6 +82,7 @@ class Image(db.Model):
 # 先定义会被路由调用的函数
 def generate_checksum(secret, nonce, cur_time):
     return hashlib.sha1(f"{secret}{nonce}{cur_time}".encode()).hexdigest()
+
 #=======================================
 #创建账号API
 #=======================================
