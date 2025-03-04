@@ -432,11 +432,14 @@ def add_image_url():
 #=======================================
 def generate_headers():
     """生成网易云信 API 请求所需的头部信息"""
-    cur_time = str(int(time.time()))  # 当前时间戳
-    nonce = 'random_string'  # 随机字符串
-    check_sum_str = APP_SECRET + nonce + cur_time
-    checksum = hashlib.sha1(check_sum_str.encode('utf-8')).hexdigest()
+    # cur_time = str(int(time.time()))  # 当前时间戳
+    # nonce = 'random_string'  # 随机字符串
+    # check_sum_str = APP_SECRET + nonce + cur_time
+    # checksum = hashlib.sha1(check_sum_str.encode('utf-8')).hexdigest()
     
+    nonce = str(uuid.uuid4())
+    cur_time = str(int(time.time()))
+    checksum = generate_checksum(APP_SECRET, nonce, cur_time)
     return {
         'AppKey': APP_KEY,
         'Nonce': nonce,
