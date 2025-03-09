@@ -1,143 +1,80 @@
-import os
+import random
 import time
-import hashlib
-import requests
+from alibabacloud_dysmsapi20170525.client import Client as DysmsapiClient
+from alibabacloud_tea_openapi import models as open_api_models
 from flask import Flask, request, jsonify
 
-# ========== 配置区 ==========
-APP_KEY = "94e2d4e8e64665e47d04e4f4e6d1840a"          # 从网易云信控制台获取
-APP_SECRET = "47d1496b029a"    # 从网易云信控制台获取
-SMS_TEMPLATE_ID = "YOUR_TEMPLATE_ID"  # 短信模板ID（需通过审核）
-# ============================
-
-# 生成API鉴权校验码
-def generate_checksum(app_secret, nonce, curtime):
-    content = f"{app_secret}{nonce}{curtime}".encode('utf-8')
-    return hashlib.sha1(content).hexdigest()
-
-# ---------------------------
-# 发送短信验证码
-# ---------------------------
-def send_sms(phone_number):
-    """
-    参数说明：
-    - phone_number: 接收短信的手机号（必须带国际区号，如中国+86）
-    文档：https://dev.yunxin.163.com/docs/短信服务/服务端API文档
-    """
-    url = "https://api.netease.im/nimserver/sms/sendcode.action"
-    
-    # 生成随机6位验证码（生产环境建议使用更安全的方法）
-    auth_code = ''.join(str(i % 10) for i in os.urandom(6))
-    
-    # 生成鉴权参数
-    nonce = os.urandom(16).hex()
-    curtime = str(int(time.time()))
-    checksum = generate_checksum(APP_SECRET, nonce, curtime)
-    
-    headers = {
-        "AppKey": APP_KEY,
-        "Nonce": nonce,
-        "CurTime": curtime,
-        "CheckSum": checksum,
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    
-    payload = {
-        "mobile": phone_number,
-        "templateid": SMS_TEMPLATE_ID,
-        "codeLen": "6",            # 验证码长度
-        "authCode": auth_code      # 可选：自定义验证码
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, data=payload)
-        result = response.json()
-        print(f"[短信发送日志] 手机号: {phone_number}, 响应: {result}")
-        
-        if result.get("code") == 200:
-            # 实际生产应将验证码存入数据库/缓存
-            return {
-                "success": True,
-                "request_id": result.get("obj"),  # 网易返回的请求ID
-                "auth_code": auth_code            # 实际生产环境不需要返回
-            }
-        else:
-            return {
-                "success": False,
-                "error_code": result.get("code"),
-                "message": result.get("desc")
-            }
-    except Exception as e:
-        return {"success": False, "message": f"API请求异常: {str(e)}"}
-
-# ---------------------------
-# 验证短信验证码
-# ---------------------------
-def verify_sms(phone_number, user_input_code):
-    """
-    参数说明：
-    - phone_number: 待验证手机号
-    - user_input_code: 用户输入的验证码
-    """
-    url = "https://api.netease.im/nimserver/sms/verifycode.action"
-    
-    # 生成鉴权参数
-    nonce = os.urandom(16).hex()
-    curtime = str(int(time.time()))
-    checksum = generate_checksum(APP_SECRET, nonce, curtime)
-    
-    headers = {
-        "AppKey": APP_KEY,
-        "Nonce": nonce,
-        "CurTime": curtime,
-        "CheckSum": checksum,
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    
-    payload = {
-        "mobile": phone_number,
-        "code": user_input_code
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, data=payload)
-        result = response.json()
-        print(f"[验证日志] 手机号: {phone_number}, 响应: {result}")
-        
-        return {
-            "valid": result.get("code") == 200,
-            "message": result.get("desc", "验证服务异常")
-        }
-    except Exception as e:
-        return {"valid": False, "message": f"API请求异常: {str(e)}"}
-
-# ======================
-# HTTP接口示例（Flask）
-# ======================
 app = Flask(__name__)
 
-@app.route('/sendsms', methods=['POST'])
-def handle_send_sms():
-    data = request.json
-    phone = data.get('phone')
-    
-    if not phone or len(phone) < 11:
-        return jsonify({"success": False, "message": "手机号无效"})
-    
-    result = send_sms(phone)
-    return jsonify(result)
+# 配置信息 - 替换为你的实际信息
+ACCESS_KEY_ID = '94e2d4e8e64665e47d04e4f4e6d1840a'
+ACCESS_KEY_SECRET = '47d1496b029a'
+SIGN_NAME = '谈信'
+TEMPLATE_CODE = 'SMS_313101151'  # 模板CODE
 
-@app.route('/verifysms', methods=['POST'])
-def handle_verify_sms():
-    data = request.json
-    phone = data.get('phone')
-    code = data.get('code')
+# 内存存储验证码（生产环境建议用Redis）
+verification_codes = {}
+
+def create_client() -> DysmsapiClient:
+    config = open_api_models.Config(
+        access_key_id=ACCESS_KEY_ID,
+        access_key_secret=ACCESS_KEY_SECRET
+    )
+    config.endpoint = 'dysmsapi.aliyuncs.com'
+    return DysmsapiClient(config)
+
+def generate_code(length=6):
+    """生成指定位数随机数字验证码"""
+    return ''.join(random.choices('0123456789', k=length))
+
+@app.route('/send_code', methods=['POST'])
+def send_verification_code():
+    mobile = request.json.get('mobile')
+    if not mobile:
+        return jsonify({'code': 400, 'message': '手机号不能为空'})
     
-    if not all([phone, code]):
-        return jsonify({"valid": False, "message": "参数缺失"})
+    # 生成验证码
+    code = generate_code()
+    verification_codes[mobile] = {
+        'code': code,
+        'timestamp': time.time()
+    }
     
-    result = verify_sms(phone, code)
-    return jsonify(result)
+    try:
+        client = create_client()
+        send_request = {
+            'phone_numbers': mobile,
+            'sign_name': SIGN_NAME,
+            'template_code': TEMPLATE_CODE,
+            'template_param': f'{{"code":"{code}"}}'
+        }
+        response = client.send_sms(send_request)
+        if response.body.code == 'OK':
+            return jsonify({'code': 200, 'message': '验证码已发送'})
+        else:
+            return jsonify({'code': 500, 'message': f'发送失败: {response.body.message}'})
+    except Exception as e:
+        return jsonify({'code': 500, 'message': f'服务器错误: {str(e)}'})
+
+@app.route('/verify_code', methods=['POST'])
+def verify_code():
+    mobile = request.json.get('mobile')
+    user_code = request.json.get('code')
+    
+    stored_data = verification_codes.get(mobile)
+    if not stored_data:
+        return jsonify({'code': 400, 'message': '请先获取验证码'})
+    
+    # 检查有效期（5分钟）
+    if time.time() - stored_data['timestamp'] > 300:
+        del verification_codes[mobile]
+        return jsonify({'code': 400, 'message': '验证码已过期'})
+    
+    if user_code == stored_data['code']:
+        del verification_codes[mobile]
+        return jsonify({'code': 200, 'message': '验证成功'})
+    else:
+        return jsonify({'code': 400, 'message': '验证码错误'})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002, debug=True)
+    app.run(debug=True)
