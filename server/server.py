@@ -8,8 +8,11 @@ import jwt
 import json
 import os
 from datetime import datetime, timedelta
+from config import Config  # 导入配置文件
 
 app = Flask(__name__)
+app.config.from_object(Config)  # 从配置文件加载配置
+
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 
 # 配置多个数据库连接
@@ -25,13 +28,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 # 创建上传目录
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# 网易云信API配置
-APP_KEY = '94e2d4e8e64665e47d04e4f4e6d1840a'
-APP_SECRET = '47d1496b029a'
-SMS_TEMPLATE_ID = "YOUR_TEMPLATE_ID"  # 短信模板ID（需通过审核）
-BASE_URL = "https://api.netease.im/nimserver/user/create.action"
-SEND_SMS_URL = "https://api.netease.im/sms/sendcode.action"
-GROPUP_URL = 'https://api.netease.im/nimserver/team/queryDetail.action'
+
 
 # 初始化单个 SQLAlchemy 实例
 db = SQLAlchemy(app)
@@ -90,10 +87,10 @@ def create_im_account(account_id, token, user_info):
     """创建网易云信账号的辅助函数"""
     nonce = str(uuid.uuid4())
     cur_time = str(int(time.time()))
-    checksum = generate_checksum(APP_SECRET, nonce, cur_time)
+    checksum = generate_checksum(app.config['APP_SECRET'], nonce, cur_time)
 
     headers = {
-        'AppKey': APP_KEY,
+        'AppKey': app.config['APP_KEY'],
         'Nonce': nonce,
         'CurTime': cur_time,
         'CheckSum': checksum,
@@ -112,7 +109,7 @@ def create_im_account(account_id, token, user_info):
         "sign": user_info.get('sign', '')
     }
 
-    response = requests.post(BASE_URL, headers=headers, data=data)
+    response = requests.post(app.config['BASE_URL'], headers=headers, data=data)
     return response.json()
 # 创建账号API
 @app.route('/create_account', methods=['POST'])
@@ -195,123 +192,6 @@ def get_all_users():
         return jsonify({"count": len(users_data), "users": users_data}), 200
     except Exception as e:
         return jsonify({"error": f"Database query failed: {str(e)}"}), 500
-#=======================================
-#发送短信验证码方法
-#=======================================
-def send_sms(phone_number):
-    """
-    参数说明：
-    - phone_number: 接收短信的手机号（必须带国际区号，如中国+86）
-    文档：https://dev.yunxin.163.com/docs/短信服务/服务端API文档
-    """
-    
-    # 生成随机6位验证码（生产环境建议使用更安全的方法）
-    auth_code = ''.join(str(i % 10) for i in os.urandom(6))
-    
-    # 生成鉴权参数
-    nonce = os.urandom(16).hex()
-    curtime = str(int(time.time()))
-    checksum = generate_checksum(APP_SECRET, nonce, curtime)
-    
-    headers = {
-        "AppKey": APP_KEY,
-        "Nonce": nonce,
-        "CurTime": curtime,
-        "CheckSum": checksum,
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    
-    payload = {
-        "mobile": phone_number,
-        "templateid": SMS_TEMPLATE_ID,
-        "codeLen": "6",            # 验证码长度
-        "authCode": auth_code      # 可选：自定义验证码
-    }
-    
-    try:
-        response = requests.post(SEND_SMS_URL, headers=headers, data=payload)
-        result = response.json()
-        print(f"[短信发送日志] 手机号: {phone_number}, 响应: {result}")
-        
-        if result.get("code") == 200:
-            # 实际生产应将验证码存入数据库/缓存
-            return {
-                "success": True,
-                "request_id": result.get("obj"),  # 网易返回的请求ID
-                "auth_code": auth_code            # 实际生产环境不需要返回
-            }
-        else:
-            return {
-                "success": False,
-                "error_code": result.get("code"),
-                "message": result.get("desc")
-            }
-    except Exception as e:
-        return {"success": False, "message": f"API请求异常: {str(e)}"}
-# 发送短信验证码API
-@app.route('/sendsms', methods=['POST'])
-def handle_send_sms():
-    data = request.json
-    phone = data.get('phone')
-    
-    if not phone or len(phone) < 11:
-        return jsonify({"success": False, "message": "手机号无效"})
-    
-    result = send_sms(phone)
-    return jsonify(result)
-#=======================================
-#验证短信验证码方法
-#=======================================
-
-def verify_sms(phone_number, user_input_code):
-    """
-    参数说明：
-    - phone_number: 待验证手机号
-    - user_input_code: 用户输入的验证码
-    """
-    url = "https://api.netease.im/nimserver/sms/verifycode.action"
-    
-    # 生成鉴权参数
-    nonce = os.urandom(16).hex()
-    curtime = str(int(time.time()))
-    checksum = generate_checksum(APP_SECRET, nonce, curtime)
-    
-    headers = {
-        "AppKey": APP_KEY,
-        "Nonce": nonce,
-        "CurTime": curtime,
-        "CheckSum": checksum,
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    
-    payload = {
-        "mobile": phone_number,
-        "code": user_input_code
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, data=payload)
-        result = response.json()
-        print(f"[验证日志] 手机号: {phone_number}, 响应: {result}")
-        
-        return {
-            "valid": result.get("code") == 200,
-            "message": result.get("desc", "验证服务异常")
-        }
-    except Exception as e:
-        return {"valid": False, "message": f"API请求异常: {str(e)}"}
-# 验证短信验证码API
-@app.route('/verifysms', methods=['POST'])
-def handle_verify_sms():
-    data = request.json
-    phone = data.get('phone')
-    code = data.get('code')
-    
-    if not all([phone, code]):
-        return jsonify({"valid": False, "message": "参数缺失"})
-    
-    result = verify_sms(phone, code)
-    return jsonify(result)
 #=======================================
 #表情管理
 #=======================================
@@ -439,9 +319,9 @@ def generate_headers():
     
     nonce = str(uuid.uuid4())
     cur_time = str(int(time.time()))
-    checksum = generate_checksum(APP_SECRET, nonce, cur_time)
+    checksum = generate_checksum(app.config['APP_SECRET'], nonce, cur_time)
     return {
-        'AppKey': APP_KEY,
+        'AppKey': app.config['APP_KEY'],
         'Nonce': nonce,
         'CurTime': cur_time,
         'CheckSum': checksum,
@@ -459,7 +339,7 @@ def get_group_info():
     #payload = {'tid': tid, 'ope': '1'}
     payload = {'tid': tid}
     headers = generate_headers()
-    response = requests.post(GROPUP_URL, headers=headers, data=payload)
+    response = requests.post(app.config['GROPUP_URL'], headers=headers, data=payload)
     
     return jsonify(response.json())
 

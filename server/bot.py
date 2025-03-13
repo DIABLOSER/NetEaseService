@@ -5,6 +5,7 @@ import hashlib
 import requests
 from flask import Flask, request, jsonify
 from datetime import datetime
+from config import Config  # 导入配置文件
 
 # ========== 配置区域 ==========
 APP_KEY = "94e2d4e8e64665e47d04e4f4e6d1840a"  # 替换为你的AppKey
